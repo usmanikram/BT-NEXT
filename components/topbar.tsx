@@ -6,8 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  LayoutDashboard,
-  Coins,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
@@ -108,12 +106,6 @@ export function Topbar({
               }
             />
             <DropdownMenuContent align="end" className="min-w-48 rounded-xl">
-              <DropdownMenuItem render={<Link href="/" />}>
-                <LayoutDashboard className="size-3.5" /> Dashboard
-              </DropdownMenuItem>
-              <DropdownMenuItem render={<Link href="/income" />}>
-                <Coins className="size-3.5" /> Income
-              </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/settings" />}>
                 <SettingsIcon className="size-3.5" /> Settings
               </DropdownMenuItem>

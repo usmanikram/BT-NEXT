@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Wallet, Receipt, BarChart3 } from "lucide-react";
+import { Home, Coins, Wallet, Receipt, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/", label: "Home", icon: Home, match: (p: string) => p === "/" },
+  { href: "/income", label: "Income", icon: Coins, match: (p: string) => p.startsWith("/income") },
   { href: "/categories", label: "Pockets", icon: Wallet, match: (p: string) => p.startsWith("/categories") },
   { href: "/expenses", label: "Spends", icon: Receipt, match: (p: string) => p.startsWith("/expenses") },
   { href: "/reports", label: "Reports", icon: BarChart3, match: (p: string) => p.startsWith("/reports") },
@@ -20,7 +21,7 @@ export function MobileNav() {
       className="md:hidden fixed bottom-3 left-3 right-3 z-40 rounded-2xl bg-ink text-cream shadow-[0_12px_30px_rgba(31,26,20,0.25)]"
       aria-label="Primary"
     >
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const active = tab.match(pathname);
