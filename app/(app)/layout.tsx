@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar";
+import { BackgroundBlobs } from "@/components/background-blobs";
 import { getCurrentUser, readCurrentMonthCookie } from "@/lib/session";
 import { listMonths } from "@/lib/budget-service";
 import { getCurrentYearMonth } from "@/lib/month";
@@ -10,12 +11,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const currentYearMonth = cookieYM ?? months[0]?.yearMonth ?? getCurrentYearMonth();
 
   return (
-    <div className="min-h-screen">
+    <div className="relative min-h-screen">
+      <BackgroundBlobs />
       <Sidebar
         months={months.map((m) => ({ yearMonth: m.yearMonth, label: m.label }))}
         currentYearMonth={currentYearMonth}
       />
-      <main className="md:pl-60">{children}</main>
+      <main className="relative z-10 md:pl-64">{children}</main>
     </div>
   );
 }

@@ -37,8 +37,8 @@ export default async function EditExpensePage({
   }
 
   return (
-    <PageShell title="Edit expense" currentYearMonth={current.yearMonth}>
-      <div className="max-w-lg rounded-xl border bg-card p-6">
+    <PageShell title="Edit spend" currentYearMonth={current.yearMonth}>
+      <div className="max-w-lg rounded-2xl bg-card p-6">
         <ExpenseForm
           monthId={row.monthId}
           yearMonth={current.yearMonth}
@@ -57,7 +57,7 @@ export default async function EditExpensePage({
             description: row.description,
           }}
           action={action}
-          submitLabel="Update"
+          submitLabel="Save"
         />
       </div>
     </PageShell>

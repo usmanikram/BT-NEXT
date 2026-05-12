@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/button-link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Money } from "@/components/money";
 import { CURRENCY_SYMBOL } from "@/lib/constants";
-import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type CategoryOption = {
@@ -74,26 +74,26 @@ export function ExpenseForm({
       <input type="hidden" name="yearMonth" value={yearMonth} />
 
       {!hasCats && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          No categories exist for this month.{" "}
+        <div className="rounded-xl bg-coral-soft px-3 py-2 text-sm text-ink">
+          You don&apos;t have any pockets for this month yet.{" "}
           <Link href="/categories/new" className="underline font-medium">
-            Create a category
+            Make one
           </Link>{" "}
           first.
         </div>
       )}
 
       <div className="space-y-1.5">
-        <Label htmlFor="categoryId">Category</Label>
+        <Label htmlFor="categoryId" className="text-xs uppercase tracking-wider text-ink-soft">Pocket</Label>
         <select
           id="categoryId"
           name="categoryId"
           required
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
-          className="flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
+          className="flex h-10 w-full rounded-lg border bg-card px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ink/15"
         >
-          <option value="">Select category…</option>
+          <option value="">Pick a pocket…</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -101,23 +101,18 @@ export function ExpenseForm({
           ))}
         </select>
         {selected && (
-          <p className="text-xs text-muted-foreground">
-            Budget <span className="font-mono">{formatMoney(selected.budgeted)}</span> · Spent{" "}
-            <span className="font-mono">{formatMoney(selected.spent)}</span> · Left{" "}
-            <span
-              className={cn(
-                "font-mono",
-                selected.budgeted - selected.spent < 0 && "text-rose-600"
-              )}
-            >
-              {formatMoney(selected.budgeted - selected.spent)}
+          <p className="text-xs text-ink-soft inline-flex items-center gap-2 flex-wrap">
+            Budget <Money value={selected.budgeted} size="sm" /> · Spent{" "}
+            <Money value={selected.spent} size="sm" /> · Left{" "}
+            <span className={cn(selected.budgeted - selected.spent < 0 && "text-coral")}>
+              <Money value={selected.budgeted - selected.spent} size="sm" />
             </span>
           </p>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="expenseDate">Date</Label>
+        <Label htmlFor="expenseDate" className="text-xs uppercase tracking-wider text-ink-soft">Date</Label>
         <Input
           id="expenseDate"
           name="expenseDate"
@@ -130,9 +125,9 @@ export function ExpenseForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="amount">Amount</Label>
+        <Label htmlFor="amount" className="text-xs uppercase tracking-wider text-ink-soft">Amount</Label>
         <div className="relative">
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-soft">
             {CURRENCY_SYMBOL.trim()}
           </span>
           <Input
@@ -150,17 +145,17 @@ export function ExpenseForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="description" className="text-xs uppercase tracking-wider text-ink-soft">What for?</Label>
         <Input
           id="description"
           name="description"
           defaultValue={initial.description}
-          placeholder="What was this expense for?"
+          placeholder="Groceries at K&Ns…"
           required
         />
       </div>
 
-      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-coral">{error}</p>}
 
       <div className="flex gap-2 pt-2">
         <Button type="submit" disabled={pending || !hasCats}>

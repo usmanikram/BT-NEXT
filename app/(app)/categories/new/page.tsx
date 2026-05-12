@@ -13,8 +13,8 @@ export default async function NewCategoryPage({
   const current = await getCurrentMonth(month);
 
   return (
-    <PageShell title="Add category" currentYearMonth={current.yearMonth}>
-      <div className="max-w-lg rounded-xl border bg-card p-6">
+    <PageShell title="New pocket" currentYearMonth={current.yearMonth}>
+      <div className="max-w-lg rounded-2xl bg-card p-6">
         <CategoryForm
           monthId={current.monthId}
           initial={{
@@ -24,7 +24,7 @@ export default async function NewCategoryPage({
             sortOrder: "0",
           }}
           action={createCategoryAction}
-          submitLabel="Save"
+          submitLabel="Create pocket"
         />
       </div>
     </PageShell>

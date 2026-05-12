@@ -47,7 +47,7 @@ export function ConfirmDelete({
           <Button
             variant="ghost"
             size="icon"
-            className="size-7 text-muted-foreground hover:text-rose-600"
+            className="size-7 text-ink-soft hover:text-coral"
           >
             <Trash2 className="size-3.5" />
           </Button>

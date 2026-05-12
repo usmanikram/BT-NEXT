@@ -34,8 +34,8 @@ export default async function EditCategoryPage({
   }
 
   return (
-    <PageShell title="Edit category" currentYearMonth={current.yearMonth}>
-      <div className="max-w-lg rounded-xl border bg-card p-6">
+    <PageShell title="Edit pocket" currentYearMonth={current.yearMonth}>
+      <div className="max-w-lg rounded-2xl bg-card p-6">
         <CategoryForm
           monthId={row.monthId}
           initial={{
@@ -45,7 +45,7 @@ export default async function EditCategoryPage({
             sortOrder: String(row.sortOrder),
           }}
           action={action}
-          submitLabel="Update"
+          submitLabel="Save"
         />
       </div>
     </PageShell>

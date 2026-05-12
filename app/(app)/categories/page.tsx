@@ -1,20 +1,50 @@
-import { Plus, Copy, Tags, Pencil, AlertTriangle, Coins, Tag as TagIcon, CheckCircle2, PiggyBank } from "lucide-react";
+import { Plus, Copy, Wallet, Pencil, AlertTriangle } from "lucide-react";
 import { ButtonLink } from "@/components/button-link";
 import { PageShell } from "@/components/page-shell";
-import { SummaryCard } from "@/components/summary-card";
-import { ColorDot } from "@/components/color-dot";
+import { Money } from "@/components/money";
+import { CategoryIcon } from "@/components/category-icon";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { getCurrentMonth, requireUserId } from "@/lib/session";
-import { formatMoney, monthLabel } from "@/lib/format";
 import { getCategoryBreakdown, getMonthSummary } from "@/lib/budget-service";
 import { cn } from "@/lib/utils";
 import { deleteCategoryAction } from "@/actions/category";
 
 function progressTone(pct: number) {
-  if (pct <= 75) return "bg-emerald-500";
-  if (pct <= 90) return "bg-amber-500";
-  return "bg-rose-500";
+  if (pct <= 75) return "bg-green";
+  if (pct <= 90) return "bg-yellow";
+  return "bg-coral";
+}
+
+function daysLeftInMonth(yearMonth: string) {
+  const [y, m] = yearMonth.split("-").map(Number);
+  const last = new Date(y, m, 0).getDate();
+  const today = new Date();
+  if (today.getFullYear() !== y || today.getMonth() + 1 !== m) return last;
+  return Math.max(0, last - today.getDate());
+}
+
+function MiniStat({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-[0_4px_14px_rgba(31,26,20,0.04)]">
+      <span
+        className="inline-block size-9 shrink-0 rounded-xl"
+        style={{ background: color, boxShadow: `0 4px 10px ${color}40` }}
+      />
+      <div className="min-w-0">
+        <p className="text-xs text-ink-soft">{label}</p>
+        <Money value={value} size="md" />
+      </div>
+    </div>
+  );
 }
 
 export default async function CategoriesPage({
@@ -31,52 +61,51 @@ export default async function CategoriesPage({
     getCategoryBreakdown(userId, current.monthId),
   ]);
 
+  const daysLeft = daysLeftInMonth(current.yearMonth);
+  const saved = summary.totalIncome - summary.totalSpent;
+
   return (
-    <PageShell title="Categories" currentYearMonth={current.yearMonth}>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <SummaryCard label="Income" value={formatMoney(summary.totalIncome)} icon={Coins} />
-        <SummaryCard label="Budgeted" value={formatMoney(summary.totalBudgeted)} icon={TagIcon} />
-        <SummaryCard label="Spent" value={formatMoney(summary.totalSpent)} icon={CheckCircle2} />
-        <SummaryCard
-          label="Unallocated"
-          value={formatMoney(summary.unallocated)}
-          icon={PiggyBank}
-          tone={summary.unallocated < 0 ? "danger" : "neutral"}
-        />
+    <PageShell title="Your pockets" currentYearMonth={current.yearMonth}>
+      {/* Top action row */}
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
+        <ButtonLink href="/categories/copy" variant="outline" size="sm" className="bg-card border-0 shadow-sm">
+          <Copy className="size-3.5" /> Copy from last month
+        </ButtonLink>
+        <ButtonLink href="/categories/new" size="sm" className="rounded-full px-4">
+          <Plus className="size-3.5" /> New pocket
+        </ButtonLink>
+      </div>
+
+      {/* Mini stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <MiniStat label="Budgeted" value={summary.totalBudgeted} color="#A98AD6" />
+        <MiniStat label="Spent" value={summary.totalSpent} color="#FF6B5C" />
+        <MiniStat label="Saved this month" value={Math.max(0, saved)} color="#7BCFA9" />
+        <MiniStat label="Unallocated" value={Math.abs(summary.unallocated)} color="#FFD86B" />
       </div>
 
       {summary.unallocated < 0 && (
-        <div className="mb-6 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          <AlertTriangle className="size-4 shrink-0" />
+        <div className="mb-6 flex items-center gap-2 rounded-2xl bg-coral-soft px-4 py-3 text-sm text-ink">
+          <AlertTriangle className="size-4 shrink-0 text-coral" />
           <span>
-            Over-allocated by <strong>{formatMoney(Math.abs(summary.unallocated))}</strong>. Your budgets exceed your income.
+            You&apos;ve over-allocated by{" "}
+            <strong>
+              <Money value={Math.abs(summary.unallocated)} size="sm" />
+            </strong>
+            . Time to trim or earn more.
           </span>
         </div>
       )}
 
-      <div className="mb-4 flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">
-          {cats.length} {cats.length === 1 ? "category" : "categories"} · {monthLabel(current.yearMonth)}
-        </span>
-        <div className="flex gap-2">
-          <ButtonLink href="/categories/copy" variant="outline" size="sm">
-            <Copy className="size-3.5" /> Copy to next month
-          </ButtonLink>
-          <ButtonLink href="/categories/new" size="sm">
-            <Plus className="size-3.5" /> Add category
-          </ButtonLink>
-        </div>
-      </div>
-
       {cats.length === 0 ? (
         <EmptyState
-          icon={Tags}
-          title="No categories yet"
-          description="Create budget categories or copy from a previous month."
+          icon={Wallet}
+          title="No pockets yet"
+          description="Bills, savings, treats — whatever you save up for."
           action={
             <div className="flex gap-2 justify-center">
-              <ButtonLink href="/categories/new" size="sm">
-                <Plus className="size-3.5" /> Add category
+              <ButtonLink href="/categories/new" size="sm" className="rounded-full px-4">
+                <Plus className="size-3.5" /> New pocket
               </ButtonLink>
               <ButtonLink href="/categories/copy" variant="outline" size="sm">
                 <Copy className="size-3.5" /> Copy from previous
@@ -90,14 +119,47 @@ export default async function CategoriesPage({
             const remaining = c.budgetedAmount - c.spent;
             const pct = c.budgetedAmount > 0 ? Math.min((c.spent / c.budgetedAmount) * 100, 100) : 0;
             const overBudget = c.spent > c.budgetedAmount;
+            const allUsed = pct >= 100 && !overBudget;
             return (
-              <div key={c.id} className="rounded-xl border bg-card p-5">
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <ColorDot color={c.color} />
-                    <h3 className="text-sm font-medium truncate">{c.name}</h3>
+              <div
+                key={c.id}
+                className="relative rounded-3xl bg-card p-6 overflow-hidden shadow-[0_4px_14px_rgba(31,26,20,0.04)]"
+              >
+                {/* Decorative tinted blob (top-right) */}
+                <div
+                  className="pointer-events-none absolute -top-8 -right-8 size-32 rounded-full opacity-25"
+                  style={{ background: c.color, filter: "blur(4px)" }}
+                  aria-hidden
+                />
+
+                <div className="relative flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <CategoryIcon name={c.name} color={c.color} size="md" />
+                    <div className="min-w-0">
+                      <h3 className="font-display text-lg font-semibold tracking-tight truncate">
+                        {c.name}
+                      </h3>
+                      <p
+                        className={cn(
+                          "text-xs mt-0.5",
+                          overBudget ? "text-coral font-medium" : "text-ink-soft"
+                        )}
+                      >
+                        {overBudget ? (
+                          <>
+                            Over by <Money value={Math.abs(remaining)} size="sm" />
+                          </>
+                        ) : allUsed ? (
+                          "All used up"
+                        ) : (
+                          <>
+                            <Money value={remaining} size="sm" /> left
+                          </>
+                        )}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 -mr-2">
+                  <div className="flex shrink-0 -mr-1 -mt-1">
                     <ButtonLink href={`/categories/${c.id}`} variant="ghost" size="icon" className="size-7">
                       <Pencil className="size-3.5" />
                     </ButtonLink>
@@ -110,33 +172,23 @@ export default async function CategoriesPage({
                   </div>
                 </div>
 
-                <div className="mb-3 flex items-baseline justify-between">
-                  <span className="text-2xl font-semibold tracking-tight font-mono tabular-nums">
-                    {formatMoney(c.spent)}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    / {formatMoney(c.budgetedAmount)}
+                <div className="relative mt-5 flex items-baseline gap-2">
+                  <Money value={c.spent} size="xl" />
+                  <span className="text-xs text-ink-soft">
+                    of <Money value={c.budgetedAmount} size="sm" />
                   </span>
                 </div>
 
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div className="relative mt-4 h-2 w-full overflow-hidden rounded-full bg-cream-soft">
                   <div
                     className={cn("h-full transition-all", progressTone(pct))}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
 
-                <div className="mt-3 flex items-center justify-between text-xs">
-                  <span
-                    className={cn(
-                      "font-mono tabular-nums",
-                      overBudget ? "text-rose-600 font-medium" : "text-muted-foreground"
-                    )}
-                  >
-                    {overBudget ? "Over " : "Left "}
-                    {formatMoney(Math.abs(remaining))}
-                  </span>
-                  <span className="text-muted-foreground">{Math.round(pct)}%</span>
+                <div className="relative mt-3 flex items-center justify-between text-xs text-ink-soft">
+                  <span className="font-mono tabular-nums">{Math.round(pct)}% used</span>
+                  <span>{daysLeft} days left</span>
                 </div>
               </div>
             );

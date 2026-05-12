@@ -105,15 +105,15 @@ export function CopyMonthForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <div className="rounded-xl border bg-card p-5 flex flex-wrap items-end gap-4">
+      <div className="rounded-2xl bg-card p-5 flex flex-wrap items-end gap-4">
         <div className="grid gap-1.5">
-          <Label htmlFor="target_month" className="text-xs">Target month</Label>
+          <Label htmlFor="target_month" className="text-xs uppercase tracking-wider text-ink-soft">Target month</Label>
           <Input
             id="target_month"
             type="month"
             value={target}
             onChange={(e) => setTarget(e.target.value)}
-            className="h-8 w-44"
+            className="h-9 w-44"
             required
           />
         </div>
@@ -122,13 +122,13 @@ export function CopyMonthForm({
             type="checkbox"
             checked={allChecked}
             onChange={(e) => toggleAll(e.target.checked)}
-            className="size-4 accent-foreground"
+            className="size-4 accent-coral"
           />
           Select all
         </label>
       </div>
 
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="rounded-2xl bg-card overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -207,7 +207,7 @@ export function CopyMonthForm({
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
-          <Copy className="size-3.5" /> {pending ? "Copying…" : "Copy"}
+          <Copy className="size-3.5" /> {pending ? "Copying…" : "Copy pockets"}
         </Button>
         <ButtonLink href="/categories" variant="outline">
           Cancel

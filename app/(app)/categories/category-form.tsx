@@ -50,7 +50,7 @@ export function CategoryForm({
       <input type="hidden" name="color" value={color} />
 
       <div className="space-y-1.5">
-        <Label htmlFor="name">Name</Label>
+        <Label htmlFor="name" className="text-xs uppercase tracking-wider text-ink-soft">Name</Label>
         <Input
           id="name"
           name="name"
@@ -61,9 +61,9 @@ export function CategoryForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="budgetedAmount">Budget</Label>
+        <Label htmlFor="budgetedAmount" className="text-xs uppercase tracking-wider text-ink-soft">Monthly budget</Label>
         <div className="relative">
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-soft">
             {CURRENCY_SYMBOL.trim()}
           </span>
           <Input
@@ -81,7 +81,7 @@ export function CategoryForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Color</Label>
+        <Label className="text-xs uppercase tracking-wider text-ink-soft">Color</Label>
         <div className="flex flex-wrap gap-2">
           {CATEGORY_COLORS.map((c) => (
             <button
@@ -90,10 +90,10 @@ export function CategoryForm({
               aria-label={`Select color ${c}`}
               onClick={() => setColor(c)}
               className={cn(
-                "size-7 rounded-full transition-all ring-offset-background",
+                "size-8 rounded-full transition-all ring-offset-background",
                 color === c
-                  ? "ring-2 ring-foreground ring-offset-2"
-                  : "ring-1 ring-inset ring-black/10 hover:scale-110"
+                  ? "ring-2 ring-ink ring-offset-2 scale-105"
+                  : "hover:scale-110"
               )}
               style={{ background: c }}
             />
@@ -102,11 +102,11 @@ export function CategoryForm({
       </div>
 
       <div className="space-y-1.5 max-w-32">
-        <Label htmlFor="sortOrder">Sort order</Label>
+        <Label htmlFor="sortOrder" className="text-xs uppercase tracking-wider text-ink-soft">Sort order</Label>
         <Input id="sortOrder" name="sortOrder" type="number" min="0" defaultValue={initial.sortOrder} />
       </div>
 
-      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-coral">{error}</p>}
 
       <div className="flex gap-2 pt-2">
         <Button type="submit" disabled={pending}>

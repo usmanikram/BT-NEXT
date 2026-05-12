@@ -16,8 +16,8 @@ export default async function NewExpensePage({
   const cats = await getCategoryBreakdown(userId, current.monthId);
 
   return (
-    <PageShell title="Add expense" currentYearMonth={current.yearMonth}>
-      <div className="max-w-lg rounded-xl border bg-card p-6">
+    <PageShell title="New spend" currentYearMonth={current.yearMonth}>
+      <div className="max-w-lg rounded-2xl bg-card p-6">
         <ExpenseForm
           monthId={current.monthId}
           yearMonth={current.yearMonth}
@@ -36,7 +36,7 @@ export default async function NewExpensePage({
             description: "",
           }}
           action={createExpenseAction}
-          submitLabel="Save"
+          submitLabel="Add it"
         />
       </div>
     </PageShell>

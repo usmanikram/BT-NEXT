@@ -12,10 +12,10 @@ export default async function SettingsPage({
 
   return (
     <PageShell title="Settings" currentYearMonth={current.yearMonth}>
-      <div className="max-w-md rounded-xl border bg-card p-6">
+      <div className="max-w-md rounded-2xl bg-card p-6">
         <div className="mb-5">
-          <h2 className="text-sm font-medium">Change password</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Update your account password.</p>
+          <h2 className="font-display text-lg font-semibold">Change password</h2>
+          <p className="text-xs text-ink-soft mt-0.5">Keep your pockets safe.</p>
         </div>
         <ChangePasswordForm />
       </div>

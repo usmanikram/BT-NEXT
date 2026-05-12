@@ -1,41 +1,36 @@
+import { Money } from "@/components/money";
 import { cn } from "@/lib/utils";
-import type { LucideIcon } from "lucide-react";
 
 export function SummaryCard({
   label,
   value,
-  icon: Icon,
-  tone = "neutral",
-  valueClass,
+  meta,
+  blobColor = "#7BCFA9",
 }: {
   label: string;
-  value: string;
-  icon?: LucideIcon;
-  tone?: "neutral" | "success" | "danger" | "warning";
-  valueClass?: string;
+  value: number;
+  meta?: string;
+  /** Color of the decorative blob in the top-right corner. */
+  blobColor?: string;
 }) {
-  const toneClass = {
-    neutral: "",
-    success: "text-emerald-700",
-    danger: "text-rose-600",
-    warning: "text-amber-700",
-  }[tone];
-
   return (
-    <div className="rounded-xl border bg-card p-5 transition-colors">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-        {Icon && <Icon className="size-4 text-muted-foreground/60" />}
+    <div className="relative rounded-2xl bg-card p-5 overflow-hidden shadow-[0_4px_14px_rgba(31,26,20,0.04)]">
+      {/* Decorative tinted blob in top-right corner */}
+      <div
+        className="pointer-events-none absolute -top-6 -right-6 size-28 rounded-full opacity-40"
+        style={{
+          background: blobColor,
+          filter: "blur(8px)",
+        }}
+        aria-hidden
+      />
+      <div className="relative">
+        <p className={cn("text-sm font-medium text-ink-soft")}>{label}</p>
+        <div className="mt-2">
+          <Money value={value} size="lg" />
+        </div>
+        {meta && <p className="mt-1.5 text-xs text-ink-soft">{meta}</p>}
       </div>
-      <p
-        className={cn(
-          "mt-3 text-2xl font-semibold tracking-tight font-mono tabular-nums",
-          toneClass,
-          valueClass
-        )}
-      >
-        {value}
-      </p>
     </div>
   );
 }

@@ -31,19 +31,25 @@ export function ChangePasswordForm() {
   return (
     <form ref={formRef} onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="currentPassword">Current password</Label>
+        <Label htmlFor="currentPassword" className="text-xs uppercase tracking-wider text-ink-soft">
+          Current password
+        </Label>
         <Input id="currentPassword" name="currentPassword" type="password" required />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="newPassword">New password</Label>
+        <Label htmlFor="newPassword" className="text-xs uppercase tracking-wider text-ink-soft">
+          New password
+        </Label>
         <Input id="newPassword" name="newPassword" type="password" minLength={6} required />
-        <p className="text-xs text-muted-foreground">At least 6 characters.</p>
+        <p className="text-xs text-ink-soft">At least 6 characters.</p>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="confirmPassword">Confirm new password</Label>
+        <Label htmlFor="confirmPassword" className="text-xs uppercase tracking-wider text-ink-soft">
+          Confirm new
+        </Label>
         <Input id="confirmPassword" name="confirmPassword" type="password" required />
       </div>
-      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-coral">{error}</p>}
       <Button type="submit" disabled={pending}>
         {pending ? "Updating…" : "Update password"}
       </Button>

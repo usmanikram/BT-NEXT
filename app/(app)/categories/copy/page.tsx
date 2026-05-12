@@ -20,19 +20,19 @@ export default async function CopyMonthPage({
   const defaultTarget = getNextYearMonth(current.yearMonth);
 
   return (
-    <PageShell title="Copy categories" currentYearMonth={current.yearMonth}>
-      <p className="text-sm text-muted-foreground mb-6">
-        Copying from <span className="text-foreground font-medium">{monthLabel(current.yearMonth)}</span> ·{" "}
-        {cats.length} {cats.length === 1 ? "category" : "categories"}
+    <PageShell title="Copy pockets" currentYearMonth={current.yearMonth}>
+      <p className="text-sm text-ink-soft mb-6">
+        Copying from <span className="text-ink font-medium">{monthLabel(current.yearMonth)}</span> ·{" "}
+        {cats.length} {cats.length === 1 ? "pocket" : "pockets"}
       </p>
       {cats.length === 0 ? (
         <EmptyState
           icon={Copy}
-          title="No categories to copy"
-          description="Create categories for the current month first."
+          title="No pockets to copy"
+          description="Create some pockets for the current month first."
           action={
             <ButtonLink href="/categories/new" size="sm">
-              <Plus className="size-3.5" /> Add category
+              <Plus className="size-3.5" /> New pocket
             </ButtonLink>
           }
         />

@@ -45,7 +45,7 @@ export function IncomeForm({
     <form onSubmit={onSubmit} className="space-y-5">
       <input type="hidden" name="monthId" value={monthId} />
       <div className="space-y-1.5">
-        <Label htmlFor="source">Source</Label>
+        <Label htmlFor="source" className="text-xs uppercase tracking-wider text-ink-soft">Source</Label>
         <Input
           id="source"
           name="source"
@@ -55,9 +55,9 @@ export function IncomeForm({
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="amount">Amount</Label>
+        <Label htmlFor="amount" className="text-xs uppercase tracking-wider text-ink-soft">Amount</Label>
         <div className="relative">
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-soft">
             {CURRENCY_SYMBOL.trim()}
           </span>
           <Input
@@ -74,10 +74,12 @@ export function IncomeForm({
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="notes">Notes <span className="text-muted-foreground font-normal">· optional</span></Label>
-        <Input id="notes" name="notes" defaultValue={initial.notes} placeholder="Any notes" />
+        <Label htmlFor="notes" className="text-xs uppercase tracking-wider text-ink-soft">
+          Notes <span className="normal-case text-ink-soft/70">· optional</span>
+        </Label>
+        <Input id="notes" name="notes" defaultValue={initial.notes} placeholder="Anything to remember?" />
       </div>
-      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-coral">{error}</p>}
       <div className="flex gap-2 pt-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : submitLabel}

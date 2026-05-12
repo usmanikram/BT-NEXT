@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +31,7 @@ export function SignupForm() {
         redirect: false,
       });
       if (res?.error) {
-        setError("Account created, but auto-login failed. Please sign in.");
+        setError("Account created — please sign in.");
         router.push("/login");
         return;
       }
@@ -40,23 +41,52 @@ export function SignupForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-5">
       <div className="space-y-1.5">
-        <Label htmlFor="fullName">Full name</Label>
-        <Input id="fullName" name="fullName" required autoFocus />
+        <Label htmlFor="fullName" className="text-sm font-medium text-ink">Name</Label>
+        <Input
+          id="fullName"
+          name="fullName"
+          required
+          autoFocus
+          placeholder="Your name"
+          className="h-12 bg-white border-ink/10 rounded-xl text-base"
+        />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" autoComplete="email" required />
+        <Label htmlFor="email" className="text-sm font-medium text-ink">Email</Label>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          placeholder="you@example.com"
+          className="h-12 bg-white border-ink/10 rounded-xl text-base"
+        />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="password">Password</Label>
-        <Input id="password" name="password" type="password" autoComplete="new-password" minLength={6} required />
-        <p className="text-xs text-muted-foreground">At least 6 characters.</p>
+        <Label htmlFor="password" className="text-sm font-medium text-ink">Password</Label>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          minLength={6}
+          required
+          placeholder="At least 6 characters"
+          className="h-12 bg-white border-ink/10 rounded-xl text-base"
+        />
       </div>
-      {error && <p className="text-xs text-rose-600">{error}</p>}
-      <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Creating…" : "Create account"}
+      {error && <p className="text-sm text-coral">{error}</p>}
+      <Button
+        type="submit"
+        disabled={pending}
+        className="w-full h-12 text-base rounded-xl bg-coral text-white hover:bg-coral/90 shadow-[0_8px_20px_rgba(255,107,92,0.3)]"
+      >
+        {pending ? "Creating…" : (
+          <>Let&apos;s go <ArrowRight className="size-4 ml-1" /></>
+        )}
       </Button>
     </form>
   );
