@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar";
+import { MobileNav } from "@/components/mobile-nav";
 import { BackgroundBlobs } from "@/components/background-blobs";
 import { getCurrentUser, readCurrentMonthCookie } from "@/lib/session";
 import { listMonths } from "@/lib/budget-service";
@@ -17,7 +18,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         months={months.map((m) => ({ yearMonth: m.yearMonth, label: m.label }))}
         currentYearMonth={currentYearMonth}
       />
-      <main className="relative z-10 md:pl-64">{children}</main>
+      <main className="relative z-10 md:pl-64 pb-24 md:pb-0">{children}</main>
+      <MobileNav />
     </div>
   );
 }

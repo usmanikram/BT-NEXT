@@ -2,7 +2,14 @@
 
 import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, LogOut, LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  LayoutDashboard,
+  Coins,
+  Settings as SettingsIcon,
+} from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   DropdownMenu,
@@ -48,20 +55,20 @@ export function Topbar({
   }
 
   return (
-    <header className="px-6 sm:px-10 pt-8 pb-6">
-      <div className="flex items-start justify-between gap-4">
+    <header className="px-4 sm:px-10 pt-6 sm:pt-8 pb-4 sm:pb-6">
+      <div className="flex items-start justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
           {eyebrow && (
             <p className="text-sm text-ink-soft mb-1">{eyebrow}</p>
           )}
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
+          <h1 className="font-display text-2xl sm:text-4xl font-semibold tracking-tight leading-tight">
             {pageTitle}
           </h1>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Month pill */}
-          <div className="hidden sm:inline-flex items-center gap-1 rounded-full bg-card pl-2 pr-2 py-1 shadow-sm">
+          <div className="inline-flex items-center gap-0.5 sm:gap-1 rounded-full bg-card pl-1 pr-1 py-1 shadow-sm">
             <button
               type="button"
               onClick={() => switchMonth(getPrevYearMonth(yearMonth))}
@@ -70,7 +77,9 @@ export function Topbar({
             >
               <ChevronLeft className="size-4" />
             </button>
-            <span className="font-display text-sm font-medium px-2">{monthLabel}</span>
+            <span className="font-display text-xs sm:text-sm font-medium px-1 sm:px-2 whitespace-nowrap">
+              {monthLabel}
+            </span>
             <button
               type="button"
               onClick={() => switchMonth(getNextYearMonth(yearMonth))}
@@ -88,7 +97,7 @@ export function Topbar({
                 <button
                   type="button"
                   title={userName}
-                  className="inline-flex size-10 items-center justify-center rounded-full text-white text-sm font-semibold shadow-[0_8px_18px_rgba(139,92,246,0.25)] focus:outline-none focus:ring-2 focus:ring-ink/20"
+                  className="inline-flex size-9 sm:size-10 items-center justify-center rounded-full text-white text-xs sm:text-sm font-semibold shadow-[0_8px_18px_rgba(139,92,246,0.25)] focus:outline-none focus:ring-2 focus:ring-ink/20"
                   style={{
                     background:
                       "linear-gradient(135deg, #FFB199 0%, #FF6B5C 40%, #A98AD6 100%)",
@@ -101,6 +110,9 @@ export function Topbar({
             <DropdownMenuContent align="end" className="min-w-48 rounded-xl">
               <DropdownMenuItem render={<Link href="/" />}>
                 <LayoutDashboard className="size-3.5" /> Dashboard
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/income" />}>
+                <Coins className="size-3.5" /> Income
               </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/settings" />}>
                 <SettingsIcon className="size-3.5" /> Settings

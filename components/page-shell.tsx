@@ -23,7 +23,7 @@ export async function PageShell({
         userName={user.name ?? user.email}
         eyebrow={eyebrow}
       />
-      <div className="px-6 sm:px-10 pb-12 mx-auto max-w-7xl">{children}</div>
+      <div className="px-4 sm:px-10 pb-12 mx-auto max-w-7xl">{children}</div>
     </>
   );
 }
