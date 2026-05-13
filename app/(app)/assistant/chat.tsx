@@ -12,6 +12,8 @@ const SUGGESTED = [
   "How is this month vs last month?",
   "Show my recent transactions",
   "How am I doing on my goals?",
+  "Who owes me money?",
+  "Show my groups",
 ];
 
 export function AssistantChat({ userName }: { userName: string }) {
@@ -52,9 +54,9 @@ export function AssistantChat({ userName }: { userName: string }) {
             <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-coral text-white shadow-[0_8px_18px_rgba(255,107,92,0.25)]">
               <Sparkles className="size-5" />
             </span>
-            <h2 className="mt-4 font-display text-xl font-semibold">Ask me anything about your money</h2>
+            <h2 className="mt-4 font-display text-xl font-semibold">Ask me about your money</h2>
             <p className="mt-1 text-sm text-ink-soft max-w-md">
-              I can read your accounts, transactions, budgets, and goals — but I can&apos;t change anything.
+              I understand specific questions about your accounts, spending, budgets, goals, groups, and friends. Try one of these:
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2 max-w-lg">
               {SUGGESTED.map((s) => (
