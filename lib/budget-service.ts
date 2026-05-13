@@ -1,9 +1,21 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { categories, expenses, income, months } from "@/db/schema";
+import { categoriesV2, budgets, transactions, userExpenseShares, months } from "@/db/schema";
 
 const n = (v: string | number | null | undefined) =>
   typeof v === "number" ? v : parseFloat((v as string) ?? "0") || 0;
+
+/** YYYY-MM extracted from the spending view's occurred_at. */
+const shareYearMonth = sql<string>`to_char(${userExpenseShares.occurredAt}, 'YYYY-MM')`;
+
+async function getYearMonth(userId: string, monthId: number): Promise<string | null> {
+  const [row] = await db
+    .select({ yearMonth: months.yearMonth })
+    .from(months)
+    .where(and(eq(months.id, monthId), eq(months.userId, userId)))
+    .limit(1);
+  return row?.yearMonth ?? null;
+}
 
 export type MonthSummary = {
   totalIncome: number;
@@ -15,20 +27,33 @@ export type MonthSummary = {
 };
 
 export async function getMonthSummary(userId: string, monthId: number): Promise<MonthSummary> {
+  const yearMonth = await getYearMonth(userId, monthId);
+
   const [incRow] = await db
-    .select({ total: sql<string>`COALESCE(SUM(${income.amount}), 0)` })
-    .from(income)
-    .where(and(eq(income.userId, userId), eq(income.monthId, monthId)));
+    .select({ total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)` })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.kind, "income"),
+        yearMonth ? sql`to_char(${transactions.occurredAt}, 'YYYY-MM') = ${yearMonth}` : sql`FALSE`
+      )
+    );
 
   const [budRow] = await db
-    .select({ total: sql<string>`COALESCE(SUM(${categories.budgetedAmount}), 0)` })
-    .from(categories)
-    .where(and(eq(categories.userId, userId), eq(categories.monthId, monthId)));
+    .select({ total: sql<string>`COALESCE(SUM(${budgets.amount}), 0)` })
+    .from(budgets)
+    .where(and(eq(budgets.userId, userId), eq(budgets.monthId, monthId)));
 
   const [spentRow] = await db
-    .select({ total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)` })
-    .from(expenses)
-    .where(and(eq(expenses.userId, userId), eq(expenses.monthId, monthId)));
+    .select({ total: sql<string>`COALESCE(SUM(${userExpenseShares.amount}), 0)` })
+    .from(userExpenseShares)
+    .where(
+      and(
+        eq(userExpenseShares.userId, userId),
+        yearMonth ? sql`to_char(${userExpenseShares.occurredAt}, 'YYYY-MM') = ${yearMonth}` : sql`FALSE`
+      )
+    );
 
   const totalIncome = n(incRow.total);
   const totalBudgeted = n(budRow.total);
@@ -52,24 +77,57 @@ export type CategoryBreakdownRow = {
   spent: number;
 };
 
+/**
+ * For a given month, return every category that either has a budget for that month
+ * OR has expense transactions in that month. Ordered by sort_order, name.
+ */
 export async function getCategoryBreakdown(
   userId: string,
   monthId: number
 ): Promise<CategoryBreakdownRow[]> {
+  const yearMonth = await getYearMonth(userId, monthId);
+  if (!yearMonth) return [];
+
+  // Subquery: spend per category for this month — per-participant share from the view.
+  const spend = db
+    .select({
+      categoryId: userExpenseShares.categoryId,
+      total: sql<string>`SUM(${userExpenseShares.amount})`.as("total"),
+    })
+    .from(userExpenseShares)
+    .where(
+      and(
+        eq(userExpenseShares.userId, userId),
+        sql`to_char(${userExpenseShares.occurredAt}, 'YYYY-MM') = ${yearMonth}`,
+        sql`${userExpenseShares.categoryId} IS NOT NULL`
+      )
+    )
+    .groupBy(userExpenseShares.categoryId)
+    .as("spend");
+
   const rows = await db
     .select({
-      id: categories.id,
-      name: categories.name,
-      color: categories.color,
-      sortOrder: categories.sortOrder,
-      budgetedAmount: categories.budgetedAmount,
-      spent: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+      id: categoriesV2.id,
+      name: categoriesV2.name,
+      color: categoriesV2.color,
+      sortOrder: categoriesV2.sortOrder,
+      budgetedAmount: sql<string>`COALESCE(${budgets.amount}, 0)`,
+      spent: sql<string>`COALESCE(${spend.total}, 0)`,
     })
-    .from(categories)
-    .leftJoin(expenses, eq(expenses.categoryId, categories.id))
-    .where(and(eq(categories.userId, userId), eq(categories.monthId, monthId)))
-    .groupBy(categories.id)
-    .orderBy(categories.sortOrder, categories.name);
+    .from(categoriesV2)
+    .leftJoin(
+      budgets,
+      and(eq(budgets.categoryId, categoriesV2.id), eq(budgets.monthId, monthId))
+    )
+    .leftJoin(spend, eq(spend.categoryId, categoriesV2.id))
+    .where(
+      and(
+        eq(categoriesV2.userId, userId),
+        eq(categoriesV2.archived, false),
+        sql`(${budgets.id} IS NOT NULL OR ${spend.total} IS NOT NULL)`
+      )
+    )
+    .orderBy(categoriesV2.sortOrder, categoriesV2.name);
 
   return rows.map((r) => ({
     id: r.id,
@@ -94,29 +152,39 @@ export async function getRecentExpenses(
   monthId: number,
   limit = 5
 ): Promise<RecentExpenseRow[]> {
+  const yearMonth = await getYearMonth(userId, monthId);
+  if (!yearMonth) return [];
+
+  // Source from the view (user's share) but JOIN transactions for description + created_at.
   const rows = await db
     .select({
-      id: expenses.id,
-      expenseDate: expenses.expenseDate,
-      amount: expenses.amount,
-      description: expenses.description,
-      createdAt: expenses.createdAt,
-      categoryName: categories.name,
-      categoryColor: categories.color,
+      id: userExpenseShares.transactionId,
+      occurredAt: userExpenseShares.occurredAt,
+      amount: userExpenseShares.amount,
+      description: transactions.description,
+      createdAt: transactions.createdAt,
+      categoryName: categoriesV2.name,
+      categoryColor: categoriesV2.color,
     })
-    .from(expenses)
-    .innerJoin(categories, eq(expenses.categoryId, categories.id))
-    .where(and(eq(expenses.userId, userId), eq(expenses.monthId, monthId)))
-    .orderBy(desc(expenses.expenseDate), desc(expenses.createdAt))
+    .from(userExpenseShares)
+    .innerJoin(transactions, eq(userExpenseShares.transactionId, transactions.id))
+    .leftJoin(categoriesV2, eq(userExpenseShares.categoryId, categoriesV2.id))
+    .where(
+      and(
+        eq(userExpenseShares.userId, userId),
+        sql`to_char(${userExpenseShares.occurredAt}, 'YYYY-MM') = ${yearMonth}`
+      )
+    )
+    .orderBy(desc(userExpenseShares.occurredAt), desc(transactions.createdAt))
     .limit(limit);
 
   return rows.map((r) => ({
     id: r.id,
-    expenseDate: r.expenseDate,
+    expenseDate: r.occurredAt.toISOString().slice(0, 10),
     amount: n(r.amount),
-    description: r.description,
-    categoryName: r.categoryName,
-    categoryColor: r.categoryColor,
+    description: r.description ?? "",
+    categoryName: r.categoryName ?? "Uncategorized",
+    categoryColor: r.categoryColor ?? "#A98AD6",
   }));
 }
 
@@ -126,18 +194,25 @@ export async function getCategoryTotals(
   userId: string,
   monthId: number
 ): Promise<CategoryTotalRow[]> {
+  const yearMonth = await getYearMonth(userId, monthId);
+  if (!yearMonth) return [];
+
   const rows = await db
     .select({
-      name: categories.name,
-      color: categories.color,
-      total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+      name: categoriesV2.name,
+      color: categoriesV2.color,
+      total: sql<string>`SUM(${userExpenseShares.amount})`,
     })
-    .from(categories)
-    .leftJoin(expenses, eq(expenses.categoryId, categories.id))
-    .where(and(eq(categories.userId, userId), eq(categories.monthId, monthId)))
-    .groupBy(categories.id, categories.name, categories.color)
-    .having(sql`COALESCE(SUM(${expenses.amount}), 0) > 0`)
-    .orderBy(desc(sql`COALESCE(SUM(${expenses.amount}), 0)`));
+    .from(userExpenseShares)
+    .innerJoin(categoriesV2, eq(userExpenseShares.categoryId, categoriesV2.id))
+    .where(
+      and(
+        eq(userExpenseShares.userId, userId),
+        sql`to_char(${userExpenseShares.occurredAt}, 'YYYY-MM') = ${yearMonth}`
+      )
+    )
+    .groupBy(categoriesV2.id, categoriesV2.name, categoriesV2.color)
+    .orderBy(desc(sql`SUM(${userExpenseShares.amount})`));
 
   return rows.map((r) => ({ name: r.name, color: r.color, total: n(r.total) }));
 }
@@ -153,12 +228,24 @@ export async function getMonthlyTrend(
   userId: string,
   count = 6
 ): Promise<MonthlyTrendRow[]> {
+  // Anchor on `months` so we always have at least the right list of months even if no txns.
   const rows = await db
     .select({
       yearMonth: months.yearMonth,
       label: months.label,
-      income: sql<string>`COALESCE((SELECT SUM(${income.amount}) FROM ${income} WHERE ${income.monthId} = ${months.id}), 0)`,
-      expenses: sql<string>`COALESCE((SELECT SUM(${expenses.amount}) FROM ${expenses} WHERE ${expenses.monthId} = ${months.id}), 0)`,
+      income: sql<string>`COALESCE((
+        SELECT SUM(${transactions.amount})
+        FROM ${transactions}
+        WHERE ${transactions.userId} = ${userId}
+          AND ${transactions.kind} = 'income'
+          AND to_char(${transactions.occurredAt}, 'YYYY-MM') = ${months.yearMonth}
+      ), 0)`,
+      expenses: sql<string>`COALESCE((
+        SELECT SUM(${userExpenseShares.amount})
+        FROM ${userExpenseShares}
+        WHERE ${userExpenseShares.userId} = ${userId}
+          AND to_char(${userExpenseShares.occurredAt}, 'YYYY-MM') = ${months.yearMonth}
+      ), 0)`,
     })
     .from(months)
     .where(eq(months.userId, userId))
@@ -173,12 +260,7 @@ export async function getMonthlyTrend(
   }));
 }
 
-export type SavingsTrendRow = {
-  yearMonth: string;
-  label: string;
-  income: number;
-  expenses: number;
-};
+export type SavingsTrendRow = MonthlyTrendRow;
 
 export async function getSavingsRateTrend(
   userId: string,
@@ -211,28 +293,37 @@ export async function getCategoryComparisonAcrossMonths(
     return { months: [], categories: [], colors: {}, data: {} };
   }
 
-  const monthIds = ordered.map((m) => m.id);
+  const yearMonths = ordered.map((m) => m.yearMonth);
+  const byYearMonth = new Map(ordered.map((m) => [m.yearMonth, m.id]));
+
   const rows = await db
     .select({
-      monthId: categories.monthId,
-      name: categories.name,
-      color: categories.color,
-      total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+      yearMonth: shareYearMonth,
+      name: categoriesV2.name,
+      color: categoriesV2.color,
+      total: sql<string>`SUM(${userExpenseShares.amount})`,
     })
-    .from(categories)
-    .leftJoin(expenses, eq(expenses.categoryId, categories.id))
-    .where(and(eq(categories.userId, userId), inArray(categories.monthId, monthIds)))
-    .groupBy(categories.monthId, categories.name, categories.color)
-    .orderBy(categories.name);
+    .from(userExpenseShares)
+    .innerJoin(categoriesV2, eq(userExpenseShares.categoryId, categoriesV2.id))
+    .where(
+      and(
+        eq(userExpenseShares.userId, userId),
+        inArray(shareYearMonth, yearMonths)
+      )
+    )
+    .groupBy(categoriesV2.id, categoriesV2.name, categoriesV2.color, shareYearMonth)
+    .orderBy(categoriesV2.name);
 
   const catNames = new Set<string>();
   const colors: Record<string, string> = {};
   const data: Record<number, Record<string, number>> = {};
   for (const r of rows) {
+    const monthId = byYearMonth.get(r.yearMonth);
+    if (!monthId) continue;
     catNames.add(r.name);
     colors[r.name] = r.color;
-    if (!data[r.monthId]) data[r.monthId] = {};
-    data[r.monthId][r.name] = n(r.total);
+    if (!data[monthId]) data[monthId] = {};
+    data[monthId][r.name] = n(r.total);
   }
 
   return {
@@ -244,9 +335,13 @@ export async function getCategoryComparisonAcrossMonths(
 }
 
 /**
- * Selection for copying a category from sourceMonth to targetMonth.
- * `rollover === "rollover"` means: finalBudget = max(0, newBudget + (sourceBudgeted - sourceSpent))
- * `rollover === "fresh"` means: finalBudget = newBudget
+ * Copy budget allocations from sourceMonth to targetMonth. Categories are global
+ * now, so we just create/update budget rows for the target month.
+ *
+ * - `rollover === 'rollover'`: finalBudget = max(0, newBudget + (sourceBudget − sourceSpent))
+ * - `rollover === 'fresh'`: finalBudget = newBudget
+ *
+ * Idempotent: an existing budget for (target_month, category) is updated, not duplicated.
  */
 export type CopySelection = {
   categoryId: number;
@@ -261,53 +356,54 @@ export async function copyCategoriesToMonth(
   targetMonthId: number,
   selections: CopySelection[]
 ): Promise<number> {
+  const sourceYearMonth = await getYearMonth(userId, sourceMonthId);
+  if (!sourceYearMonth) return 0;
+
   let count = 0;
   for (const sel of selections) {
     if (!sel.include) continue;
 
-    const [source] = await db
-      .select({
-        name: categories.name,
-        color: categories.color,
-        sortOrder: categories.sortOrder,
-        budgetedAmount: categories.budgetedAmount,
-        spent: sql<string>`COALESCE((SELECT SUM(${expenses.amount}) FROM ${expenses} WHERE ${expenses.categoryId} = ${categories.id}), 0)`,
-      })
-      .from(categories)
-      .where(and(eq(categories.userId, userId), eq(categories.id, sel.categoryId)))
-      .limit(1);
-
-    if (!source) continue;
-
+    // Compute rollover from source budget + source spent
     let finalBudget = sel.newBudget;
     if (sel.rollover === "rollover") {
-      const unspent = n(source.budgetedAmount) - n(source.spent);
+      const [srcBudget] = await db
+        .select({ amount: budgets.amount })
+        .from(budgets)
+        .where(
+          and(
+            eq(budgets.userId, userId),
+            eq(budgets.monthId, sourceMonthId),
+            eq(budgets.categoryId, sel.categoryId)
+          )
+        )
+        .limit(1);
+      const [srcSpent] = await db
+        .select({ total: sql<string>`COALESCE(SUM(${userExpenseShares.amount}), 0)` })
+        .from(userExpenseShares)
+        .where(
+          and(
+            eq(userExpenseShares.userId, userId),
+            eq(userExpenseShares.categoryId, sel.categoryId),
+            sql`to_char(${userExpenseShares.occurredAt}, 'YYYY-MM') = ${sourceYearMonth}`
+          )
+        );
+      const unspent = n(srcBudget?.amount ?? "0") - n(srcSpent?.total ?? "0");
       finalBudget = Math.max(0, sel.newBudget + unspent);
     }
 
-    // Duplicate-name guard (idempotent re-run): skip silently if a category with the same name exists in the target month
-    const [exists] = await db
-      .select({ id: categories.id })
-      .from(categories)
-      .where(
-        and(
-          eq(categories.userId, userId),
-          eq(categories.monthId, targetMonthId),
-          eq(categories.name, source.name)
-        )
-      )
-      .limit(1);
-
-    if (exists) continue;
-
-    await db.insert(categories).values({
-      userId,
-      monthId: targetMonthId,
-      name: source.name,
-      budgetedAmount: finalBudget.toFixed(2),
-      color: source.color,
-      sortOrder: source.sortOrder,
-    });
+    // Upsert budget for target month
+    await db
+      .insert(budgets)
+      .values({
+        userId,
+        monthId: targetMonthId,
+        categoryId: sel.categoryId,
+        amount: finalBudget.toFixed(2),
+      })
+      .onConflictDoUpdate({
+        target: [budgets.userId, budgets.monthId, budgets.categoryId],
+        set: { amount: finalBudget.toFixed(2), updatedAt: new Date() },
+      });
     count++;
   }
   return count;
@@ -319,4 +415,73 @@ export async function listMonths(userId: string) {
     .from(months)
     .where(eq(months.userId, userId))
     .orderBy(desc(months.yearMonth));
+}
+
+/**
+ * Categories that have either a budget for the source month or a recent expense for it.
+ * Used by the copy-month page to populate selections.
+ */
+export type CopyableCategory = {
+  categoryId: number;
+  name: string;
+  color: string;
+  sortOrder: number;
+  budgetedAmount: number;
+  spent: number;
+};
+
+export async function getCopyableCategoriesForMonth(
+  userId: string,
+  monthId: number
+): Promise<CopyableCategory[]> {
+  const rows = await getCategoryBreakdown(userId, monthId);
+  return rows.map((r) => ({
+    categoryId: r.id,
+    name: r.name,
+    color: r.color,
+    sortOrder: 0,
+    budgetedAmount: r.budgetedAmount,
+    spent: r.spent,
+  }));
+}
+
+/**
+ * Alerts: categories at/above 75% (warn), 90% (danger), 100% (over).
+ * Returns the worst-severity rows first.
+ */
+export type BudgetAlert = {
+  categoryId: number;
+  name: string;
+  color: string;
+  budgetedAmount: number;
+  spent: number;
+  percent: number;
+  severity: "warn" | "danger" | "over";
+};
+
+export async function getBudgetAlerts(userId: string, monthId: number): Promise<BudgetAlert[]> {
+  const rows = await getCategoryBreakdown(userId, monthId);
+  const alerts: BudgetAlert[] = [];
+  for (const r of rows) {
+    if (r.budgetedAmount <= 0) continue;
+    const pct = (r.spent / r.budgetedAmount) * 100;
+    let severity: BudgetAlert["severity"] | null = null;
+    if (pct >= 100) severity = "over";
+    else if (pct >= 90) severity = "danger";
+    else if (pct >= 75) severity = "warn";
+    if (!severity) continue;
+    alerts.push({
+      categoryId: r.id,
+      name: r.name,
+      color: r.color,
+      budgetedAmount: r.budgetedAmount,
+      spent: r.spent,
+      percent: pct,
+      severity,
+    });
+  }
+  return alerts.sort((a, b) => {
+    const order = { over: 0, danger: 1, warn: 2 };
+    return order[a.severity] - order[b.severity];
+  });
 }

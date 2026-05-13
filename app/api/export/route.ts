@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { and, eq, like, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { categories, expenses, income, months } from "@/db/schema";
+import { transactions, categoriesV2, budgets, months, userExpenseShares } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 
 function csvEscape(v: unknown): string {
@@ -43,18 +43,27 @@ export async function GET(req: NextRequest) {
 
     const rows = await db
       .select({
-        date: expenses.expenseDate,
-        category: categories.name,
-        description: expenses.description,
-        amount: expenses.amount,
+        date: sql<string>`to_char(${userExpenseShares.occurredAt}, 'YYYY-MM-DD')`,
+        category: categoriesV2.name,
+        description: transactions.description,
+        amount: userExpenseShares.amount,
+        currency: userExpenseShares.currency,
       })
-      .from(expenses)
-      .innerJoin(categories, eq(expenses.categoryId, categories.id))
-      .where(and(eq(expenses.userId, userId), eq(expenses.monthId, monthId)))
-      .orderBy(expenses.expenseDate, categories.name);
+      .from(userExpenseShares)
+      .innerJoin(transactions, eq(userExpenseShares.transactionId, transactions.id))
+      .leftJoin(categoriesV2, eq(userExpenseShares.categoryId, categoriesV2.id))
+      .where(
+        and(
+          eq(userExpenseShares.userId, userId),
+          sql`to_char(${userExpenseShares.occurredAt}, 'YYYY-MM') = ${m.yearMonth}`
+        )
+      )
+      .orderBy(userExpenseShares.occurredAt, categoriesV2.name);
 
-    const lines = [csvRow(["Date", "Category", "Description", "Amount"])];
-    for (const r of rows) lines.push(csvRow([r.date, r.category, r.description, r.amount]));
+    const lines = [csvRow(["Date", "Category", "Description", "Amount", "Currency"])];
+    for (const r of rows) {
+      lines.push(csvRow([r.date, r.category ?? "Uncategorized", r.description ?? "", r.amount, r.currency]));
+    }
     return csvResponse(`expenses-${m.yearMonth}.csv`, lines.join("\r\n"));
   }
 
@@ -67,17 +76,40 @@ export async function GET(req: NextRequest) {
       .limit(1);
     if (!m) return new Response("Month not found", { status: 404 });
 
+    const spend = db
+      .select({
+        categoryId: userExpenseShares.categoryId,
+        total: sql<string>`SUM(${userExpenseShares.amount})`.as("total"),
+      })
+      .from(userExpenseShares)
+      .where(
+        and(
+          eq(userExpenseShares.userId, userId),
+          sql`to_char(${userExpenseShares.occurredAt}, 'YYYY-MM') = ${m.yearMonth}`
+        )
+      )
+      .groupBy(userExpenseShares.categoryId)
+      .as("spend");
+
     const rows = await db
       .select({
-        name: categories.name,
-        budgeted: categories.budgetedAmount,
-        spent: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+        name: categoriesV2.name,
+        budgeted: sql<string>`COALESCE(${budgets.amount}, 0)`,
+        spent: sql<string>`COALESCE(${spend.total}, 0)`,
       })
-      .from(categories)
-      .leftJoin(expenses, eq(expenses.categoryId, categories.id))
-      .where(and(eq(categories.userId, userId), eq(categories.monthId, monthId)))
-      .groupBy(categories.id)
-      .orderBy(categories.sortOrder, categories.name);
+      .from(categoriesV2)
+      .leftJoin(
+        budgets,
+        and(eq(budgets.categoryId, categoriesV2.id), eq(budgets.monthId, monthId))
+      )
+      .leftJoin(spend, eq(spend.categoryId, categoriesV2.id))
+      .where(
+        and(
+          eq(categoriesV2.userId, userId),
+          sql`(${budgets.id} IS NOT NULL OR ${spend.total} IS NOT NULL)`
+        )
+      )
+      .orderBy(categoriesV2.sortOrder, categoriesV2.name);
 
     const lines = [csvRow(["Category", "Budgeted", "Spent", "Remaining", "% Used"])];
     for (const r of rows) {
@@ -96,9 +128,20 @@ export async function GET(req: NextRequest) {
       .select({
         yearMonth: months.yearMonth,
         label: months.label,
-        income: sql<string>`COALESCE((SELECT SUM(amount) FROM income WHERE income.month_id = ${months.id}), 0)`,
-        budgeted: sql<string>`COALESCE((SELECT SUM(budgeted_amount) FROM categories WHERE categories.month_id = ${months.id}), 0)`,
-        spent: sql<string>`COALESCE((SELECT SUM(amount) FROM expenses WHERE expenses.month_id = ${months.id}), 0)`,
+        income: sql<string>`COALESCE((
+          SELECT SUM(amount) FROM transactions
+          WHERE transactions.user_id = ${userId}
+            AND transactions.kind = 'income'
+            AND to_char(transactions.occurred_at, 'YYYY-MM') = ${months.yearMonth}
+        ), 0)`,
+        budgeted: sql<string>`COALESCE((
+          SELECT SUM(amount) FROM budgets WHERE budgets.month_id = ${months.id}
+        ), 0)`,
+        spent: sql<string>`COALESCE((
+          SELECT SUM(amount) FROM user_expense_shares
+          WHERE user_expense_shares.user_id = ${userId}
+            AND to_char(user_expense_shares.occurred_at, 'YYYY-MM') = ${months.yearMonth}
+        ), 0)`,
       })
       .from(months)
       .where(and(eq(months.userId, userId), like(months.yearMonth, `${year}-%`)))

@@ -1,12 +1,14 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/reset"];
 
 export default auth((req) => {
   const { nextUrl } = req;
   const isAuthed = !!req.auth;
   const isPublic = PUBLIC_PATHS.some((p) => nextUrl.pathname.startsWith(p));
+  const isAdminPath = nextUrl.pathname.startsWith("/admin");
+  const role = req.auth?.user?.role;
 
   if (!isAuthed && !isPublic) {
     const loginUrl = new URL("/login", nextUrl);
@@ -14,6 +16,9 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
   if (isAuthed && isPublic) {
+    return NextResponse.redirect(new URL("/", nextUrl));
+  }
+  if (isAuthed && isAdminPath && role !== "admin") {
     return NextResponse.redirect(new URL("/", nextUrl));
   }
   return NextResponse.next();

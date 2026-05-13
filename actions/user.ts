@@ -47,3 +47,15 @@ export async function changePasswordAction(formData: FormData): Promise<ActionRe
 
   return { ok: true };
 }
+
+const currencySchema = z.string().trim().length(3, "Currency must be a 3-letter ISO code").toUpperCase();
+
+export async function updateDefaultCurrencyAction(formData: FormData): Promise<ActionResult> {
+  const userId = await requireUserId();
+  const parsed = currencySchema.safeParse(String(formData.get("defaultCurrency") ?? ""));
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid currency" };
+  }
+  await db.update(users).set({ defaultCurrency: parsed.data }).where(eq(users.id, userId));
+  return { ok: true };
+}

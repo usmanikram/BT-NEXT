@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { categories, expenses } from "@/db/schema";
+import { categoriesV2, budgets } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 
 const schema = z.object({
@@ -18,6 +18,11 @@ const schema = z.object({
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * Create a global category (if name unique) and set its budget for this month.
+ * If a category with the same name already exists globally, reuse it and only
+ * upsert the budget for the month.
+ */
 export async function createCategoryAction(formData: FormData): Promise<ActionResult> {
   const userId = await requireUserId();
   const parsed = schema.safeParse({
@@ -32,25 +37,54 @@ export async function createCategoryAction(formData: FormData): Promise<ActionRe
   }
   const { monthId, name, budgetedAmount, color, sortOrder } = parsed.data;
 
-  const [dup] = await db
-    .select({ id: categories.id })
-    .from(categories)
-    .where(and(eq(categories.userId, userId), eq(categories.monthId, monthId), eq(categories.name, name)))
+  // Reuse global category if one already exists with this name (case-sensitive match
+  // matches the unique index).
+  const [existing] = await db
+    .select({ id: categoriesV2.id })
+    .from(categoriesV2)
+    .where(and(eq(categoriesV2.userId, userId), eq(categoriesV2.name, name)))
     .limit(1);
-  if (dup) return { ok: false, error: "A category with this name already exists for this month." };
 
-  await db.insert(categories).values({
-    userId,
-    monthId,
-    name,
-    budgetedAmount: budgetedAmount.toFixed(2),
-    color,
-    sortOrder,
-  });
+  let categoryId: number;
+  if (existing) {
+    categoryId = existing.id;
+  } else {
+    const [inserted] = await db
+      .insert(categoriesV2)
+      .values({
+        userId,
+        name,
+        kind: "expense",
+        color,
+        sortOrder,
+      })
+      .returning({ id: categoriesV2.id });
+    categoryId = inserted.id;
+  }
+
+  // Upsert budget for this month (in case it was already there from a previous attempt)
+  await db
+    .insert(budgets)
+    .values({
+      userId,
+      monthId,
+      categoryId,
+      amount: budgetedAmount.toFixed(2),
+    })
+    .onConflictDoUpdate({
+      target: [budgets.userId, budgets.monthId, budgets.categoryId],
+      set: { amount: budgetedAmount.toFixed(2), updatedAt: new Date() },
+    });
+
   revalidatePath("/categories");
+  revalidatePath("/");
   redirect("/categories");
 }
 
+/**
+ * Update a global category (name, color, sort) and the budget for this month.
+ * Renames apply globally — this is intentional in the new model.
+ */
 export async function updateCategoryAction(
   id: number,
   formData: FormData
@@ -69,46 +103,67 @@ export async function updateCategoryAction(
   const { monthId, name, budgetedAmount, color, sortOrder } = parsed.data;
 
   const [dup] = await db
-    .select({ id: categories.id })
-    .from(categories)
+    .select({ id: categoriesV2.id })
+    .from(categoriesV2)
     .where(
-      and(
-        eq(categories.userId, userId),
-        eq(categories.monthId, monthId),
-        eq(categories.name, name),
-        ne(categories.id, id)
-      )
+      and(eq(categoriesV2.userId, userId), eq(categoriesV2.name, name), ne(categoriesV2.id, id))
     )
     .limit(1);
-  if (dup) return { ok: false, error: "A category with this name already exists for this month." };
+  if (dup) return { ok: false, error: "Another pocket already has this name." };
 
   await db
-    .update(categories)
-    .set({
-      name,
-      budgetedAmount: budgetedAmount.toFixed(2),
-      color,
-      sortOrder,
-      updatedAt: new Date(),
+    .update(categoriesV2)
+    .set({ name, color, sortOrder })
+    .where(and(eq(categoriesV2.id, id), eq(categoriesV2.userId, userId)));
+
+  await db
+    .insert(budgets)
+    .values({
+      userId,
+      monthId,
+      categoryId: id,
+      amount: budgetedAmount.toFixed(2),
     })
-    .where(and(eq(categories.id, id), eq(categories.userId, userId)));
+    .onConflictDoUpdate({
+      target: [budgets.userId, budgets.monthId, budgets.categoryId],
+      set: { amount: budgetedAmount.toFixed(2), updatedAt: new Date() },
+    });
+
   revalidatePath("/categories");
+  revalidatePath("/");
   redirect("/categories");
 }
 
-export async function deleteCategoryAction(id: number): Promise<ActionResult> {
+/**
+ * Remove the budget for this category in this month — keeps the global category alive
+ * so historical transactions stay categorized. The legacy DELETE semantics ("can't delete
+ * categories with expenses") don't apply here because we don't drop the category itself.
+ */
+export async function deleteCategoryAction(id: number, monthIdOpt?: number): Promise<ActionResult> {
   const userId = await requireUserId();
-  const [c] = await db
-    .select({ n: count() })
-    .from(expenses)
-    .where(and(eq(expenses.categoryId, id), eq(expenses.userId, userId)));
-  if (c && Number(c.n) > 0) {
-    return {
-      ok: false,
-      error: `Cannot delete: this category has ${c.n} expense(s). Delete them first.`,
-    };
+
+  // monthId comes through a closure on the page (server component) — actions only see id.
+  // For backward compatibility with current call-sites that pass only the id, we delete
+  // the budget for the *current* month from the cookie/searchParams isn't reachable here.
+  // Instead: delete ALL budgets for this category for the user. Conservative; user can
+  // re-budget for this month if they wanted just one month removed.
+  if (monthIdOpt) {
+    await db
+      .delete(budgets)
+      .where(
+        and(
+          eq(budgets.userId, userId),
+          eq(budgets.categoryId, id),
+          eq(budgets.monthId, monthIdOpt)
+        )
+      );
+  } else {
+    await db
+      .delete(budgets)
+      .where(and(eq(budgets.userId, userId), eq(budgets.categoryId, id)));
   }
-  await db.delete(categories).where(and(eq(categories.id, id), eq(categories.userId, userId)));
+
   revalidatePath("/categories");
+  revalidatePath("/");
   return { ok: true };
 }

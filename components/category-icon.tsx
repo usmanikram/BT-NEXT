@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import {
   Home,
   ShoppingCart,
@@ -50,9 +51,9 @@ export function CategoryIcon({
   size?: "sm" | "md" | "lg";
   className?: string;
 }) {
-  const Icon = iconFor(name);
+  const iconType = iconFor(name);
   const dim = { sm: "size-8", md: "size-10", lg: "size-12" }[size];
-  const icon = { sm: "size-4", md: "size-5", lg: "size-6" }[size];
+  const iconClass = { sm: "size-4", md: "size-5", lg: "size-6" }[size];
   return (
     <span
       className={cn(
@@ -66,7 +67,7 @@ export function CategoryIcon({
       }}
       aria-hidden
     >
-      <Icon className={icon} strokeWidth={2.25} />
+      {createElement(iconType, { className: iconClass, strokeWidth: 2.25 })}
     </span>
   );
 }

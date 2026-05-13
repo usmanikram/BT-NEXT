@@ -4,13 +4,18 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
-  Coins,
   Wallet,
-  Receipt,
   BarChart3,
   Settings,
   ChevronLeft,
   ChevronRight,
+  Landmark,
+  ArrowLeftRight,
+  Target,
+  Sparkles,
+  Users,
+  UserRound,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
@@ -41,9 +46,14 @@ export function Sidebar({
 
   const nav = [
     { href: "/", label: "Home", icon: Home, match: "/" },
-    { href: "/income", label: "Income", icon: Coins, match: "/income" },
+    { href: "/sources", label: "Sources", icon: Landmark, match: "/sources" },
+    { href: "/transactions", label: "Transactions", icon: ArrowLeftRight, match: "/transactions" },
     { href: "/categories", label: "Pockets", icon: Wallet, match: "/categories" },
-    { href: "/expenses", label: "Spends", icon: Receipt, match: "/expenses" },
+    { href: "/groups", label: "Groups", icon: Users, match: "/groups" },
+    { href: "/friends", label: "Friends", icon: UserRound, match: "/friends" },
+    { href: "/balances", label: "Balances", icon: Scale, match: "/balances" },
+    { href: "/goals", label: "Goals", icon: Target, match: "/goals" },
+    { href: "/assistant", label: "Assistant", icon: Sparkles, match: "/assistant" },
     { href: "/reports", label: "Reports", icon: BarChart3, match: "/reports" },
     { href: "/settings", label: "Settings", icon: Settings, match: "/settings" },
   ];

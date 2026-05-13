@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Coins, Wallet, Receipt, BarChart3 } from "lucide-react";
+import { Home, Landmark, Wallet, ArrowLeftRight, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/", label: "Home", icon: Home, match: (p: string) => p === "/" },
-  { href: "/income", label: "Income", icon: Coins, match: (p: string) => p.startsWith("/income") },
+  { href: "/sources", label: "Sources", icon: Landmark, match: (p: string) => p.startsWith("/sources") },
+  { href: "/transactions", label: "Moves", icon: ArrowLeftRight, match: (p: string) => p.startsWith("/transactions") },
   { href: "/categories", label: "Pockets", icon: Wallet, match: (p: string) => p.startsWith("/categories") },
-  { href: "/expenses", label: "Spends", icon: Receipt, match: (p: string) => p.startsWith("/expenses") },
   { href: "/reports", label: "Reports", icon: BarChart3, match: (p: string) => p.startsWith("/reports") },
 ];
 

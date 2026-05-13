@@ -12,6 +12,7 @@ declare module "next-auth" {
       id: string;
       email: string;
       name?: string | null;
+      role?: "user" | "admin";
     } & DefaultSession["user"];
   }
 }
@@ -44,6 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .limit(1);
 
         if (!user) return null;
+        if (user.disabled) return null;
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) return null;
 
@@ -51,6 +53,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: user.id,
           email: user.email,
           name: user.fullName ?? undefined,
+          role: user.role,
         };
       },
     }),
@@ -59,12 +62,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id as string;
+        token.role = (user as { role?: "user" | "admin" }).role;
       }
       return token;
     },
     async session({ session, token }) {
       if (token?.id) {
         session.user.id = token.id as string;
+        session.user.role = (token.role as "user" | "admin" | undefined) ?? "user";
       }
       return session;
     },

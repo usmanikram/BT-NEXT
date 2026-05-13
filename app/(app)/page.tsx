@@ -1,22 +1,28 @@
 import Link from "next/link";
-import { ArrowRight, PieChart as PieIcon, BarChart3, Receipt, TrendingUp } from "lucide-react";
+import { eq } from "drizzle-orm";
+import { ArrowRight, PieChart as PieIcon, Receipt, TrendingUp } from "lucide-react";
 import { PageShell } from "@/components/page-shell";
 import { SummaryCard } from "@/components/summary-card";
 import { Money } from "@/components/money";
 import { CategoryIcon } from "@/components/category-icon";
 import { EmptyState } from "@/components/empty-state";
 import { HeroMascot } from "@/components/hero-mascot";
-import { CategoryPie } from "@/components/charts/category-pie";
 import { MonthlyTrend } from "@/components/charts/monthly-trend";
 import { getCurrentMonth, getCurrentUser, requireUserId } from "@/lib/session";
 import { formatDate } from "@/lib/format";
+import { db } from "@/lib/db";
+import { users } from "@/db/schema";
+import { listSources } from "@/lib/source-service";
+import { sumInCurrency } from "@/lib/fx";
 import {
+  getBudgetAlerts,
   getCategoryBreakdown,
-  getCategoryTotals,
   getMonthlyTrend,
   getMonthSummary,
   getRecentExpenses,
 } from "@/lib/budget-service";
+import { listGoals } from "@/lib/goal-service";
+import { getOverallBalances, summarizeBalances } from "@/lib/settlement-service";
 import { monthLabel as fmtMonth } from "@/lib/format";
 
 function firstName(name: string) {
@@ -41,13 +47,31 @@ export default async function DashboardPage({
   const { month } = await searchParams;
   const current = await getCurrentMonth(month);
 
-  const [summary, breakdown, recent, trend, pie] = await Promise.all([
+  const [summary, breakdown, recent, trend, sources, userRow, alerts, goals, balances] = await Promise.all([
     getMonthSummary(userId, current.monthId),
     getCategoryBreakdown(userId, current.monthId),
     getRecentExpenses(userId, current.monthId, 6),
     getMonthlyTrend(userId, 6),
-    getCategoryTotals(userId, current.monthId),
+    listSources(userId, false),
+    db.select({ defaultCurrency: users.defaultCurrency }).from(users).where(eq(users.id, userId)).limit(1).then((r) => r[0]),
+    getBudgetAlerts(userId, current.monthId),
+    listGoals(userId),
+    getOverallBalances(userId),
   ]);
+  const activeGoals = goals.filter((g) => !g.completedAt).slice(0, 3);
+  const balanceTotals = summarizeBalances(balances);
+
+  // Total balance summed by currency, then rolled up to default via FX.
+  const balanceByCurrency = sources.reduce<Record<string, number>>((acc, s) => {
+    acc[s.currency] = (acc[s.currency] ?? 0) + s.balance;
+    return acc;
+  }, {});
+  const defaultCurrency = userRow?.defaultCurrency ?? "PKR";
+  const totalBalanceInDefault = await sumInCurrency(
+    Object.entries(balanceByCurrency).map(([currency, amount]) => ({ currency, amount })),
+    defaultCurrency
+  );
+  const otherCurrencies = Object.entries(balanceByCurrency).filter(([cur]) => cur !== defaultCurrency);
 
   const trendForChart = [...trend].reverse().map((t) => ({
     label: t.label,
@@ -106,18 +130,51 @@ export default async function DashboardPage({
         </div>
       </section>
 
-      {/* Summary trio */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {/* Budget alerts banner */}
+      {alerts.length > 0 && (
+        <div className="mb-6 rounded-2xl bg-coral-soft px-4 py-3 text-sm text-ink">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-block size-2 rounded-full bg-coral" />
+            <strong className="font-medium">
+              {alerts.length} pocket{alerts.length === 1 ? "" : "s"} need{alerts.length === 1 ? "s" : ""} attention
+            </strong>
+          </div>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft">
+            {alerts.slice(0, 4).map((a) => (
+              <li key={a.categoryId}>
+                <span className="font-medium text-ink">{a.name}</span>{" "}
+                <span className={a.severity === "over" ? "text-coral font-medium" : a.severity === "danger" ? "text-coral" : ""}>
+                  {Math.round(a.percent)}% used{a.severity === "over" ? " · over" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Summary quartet — Total Balance + Income + Budgeted + Spent */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <SummaryCard
+          label="Total balance"
+          value={totalBalanceInDefault}
+          prefix={defaultCurrency}
+          meta={
+            otherCurrencies.length > 0
+              ? `+ ${otherCurrencies.map(([c, v]) => `${c} ${v.toFixed(0)}`).join(", ")}`
+              : `${sources.length} source${sources.length === 1 ? "" : "s"}`
+          }
+          blobColor="#FFD86B"
+        />
         <SummaryCard
           label="Income"
           value={summary.totalIncome}
-          meta="3 sources · steady"
+          meta={`This month · ${summary.totalIncome > 0 ? "steady" : "none yet"}`}
           blobColor="#7BCFA9"
         />
         <SummaryCard
           label="Budgeted"
           value={summary.totalBudgeted}
-          meta={`${breakdown.length} pockets · ${
+          meta={`${breakdown.length} pocket${breakdown.length === 1 ? "" : "s"} · ${
             summary.totalIncome > 0
               ? Math.round((summary.totalBudgeted / summary.totalIncome) * 100)
               : 0
@@ -180,6 +237,74 @@ export default async function DashboardPage({
         </section>
       </div>
 
+      {/* Shared balances tile */}
+      {Object.keys(balanceTotals).length > 0 && (
+        <section className="rounded-3xl bg-card p-7 mb-6 shadow-[0_4px_14px_rgba(31,26,20,0.04)]">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="font-display text-2xl font-semibold tracking-tight">Shared balances</h2>
+              <p className="text-sm text-ink-soft">Who owes whom across groups and friends</p>
+            </div>
+            <Link href="/balances" className="inline-flex items-center gap-1 text-sm text-coral font-medium hover:underline">
+              See all <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {Object.entries(balanceTotals).map(([cur, t]) => (
+              <div key={cur} className="rounded-2xl bg-cream-soft p-4">
+                <p className="text-[10px] uppercase tracking-wider text-ink-soft">{cur}</p>
+                <div className="mt-1 grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-[11px] text-ink-soft">You&apos;re owed</p>
+                    <Money value={t.owed} prefix={cur} size="sm" className="text-green" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-ink-soft">You owe</p>
+                    <Money value={t.owe} prefix={cur} size="sm" className="text-coral" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Goals widget */}
+      {activeGoals.length > 0 && (
+        <section className="rounded-3xl bg-card p-7 mb-6 shadow-[0_4px_14px_rgba(31,26,20,0.04)]">
+          <div className="flex items-start justify-between mb-5">
+            <div>
+              <h2 className="font-display text-2xl font-semibold tracking-tight">Goals</h2>
+              <p className="text-sm text-ink-soft">What you&apos;re saving toward</p>
+            </div>
+            <Link href="/goals" className="inline-flex items-center gap-1 text-sm text-coral font-medium hover:underline">
+              See all <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {activeGoals.map((g) => (
+              <Link key={g.id} href={`/goals/${g.id}`} className="block rounded-2xl bg-cream-soft p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium truncate">{g.name}</span>
+                  <span className="text-xs text-ink-soft font-mono tabular-nums">
+                    {Math.round(g.percent)}%
+                  </span>
+                </div>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <Money value={g.currentAmount} prefix={g.currency} size="sm" />
+                  <span className="text-xs text-ink-soft">
+                    / <Money value={g.targetAmount} prefix={g.currency} size="sm" />
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-card">
+                  <div className="h-full" style={{ width: `${g.percent}%`, background: g.color }} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Recent moves — grid of cards */}
       <section className="rounded-3xl bg-card p-7 shadow-[0_4px_14px_rgba(31,26,20,0.04)]">
         <div className="flex items-start justify-between mb-5">
@@ -188,7 +313,7 @@ export default async function DashboardPage({
             <p className="text-sm text-ink-soft">Latest in your pockets</p>
           </div>
           <Link
-            href="/expenses"
+            href="/transactions"
             className="inline-flex items-center gap-1 text-sm text-coral font-medium hover:underline"
           >
             See all <ArrowRight className="size-3.5" />

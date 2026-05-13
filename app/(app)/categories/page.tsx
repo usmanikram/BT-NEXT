@@ -164,9 +164,11 @@ export default async function CategoriesPage({
                       <Pencil className="size-3.5" />
                     </ButtonLink>
                     <ConfirmDelete
+                      title="Remove from this month?"
+                      description="The pocket stays in your list — only this month's budget cap is removed."
                       onConfirm={async () => {
                         "use server";
-                        return deleteCategoryAction(c.id);
+                        return deleteCategoryAction(c.id, current.monthId);
                       }}
                     />
                   </div>

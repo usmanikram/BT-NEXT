@@ -32,6 +32,12 @@ export default async function LoginPage({
         <LoginForm callbackUrl={from ?? "/"} />
       </div>
 
+      <p className="mt-4 text-center text-sm">
+        <Link href="/forgot" className="text-ink-soft hover:text-ink underline">
+          Forgot password?
+        </Link>
+      </p>
+
       <p className="mt-6 text-center text-sm text-ink-soft">
         No account yet?{" "}
         <Link

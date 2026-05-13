@@ -5,11 +5,13 @@ export function SummaryCard({
   label,
   value,
   meta,
+  prefix,
   blobColor = "#7BCFA9",
 }: {
   label: string;
   value: number;
   meta?: string;
+  prefix?: string;
   /** Color of the decorative blob in the top-right corner. */
   blobColor?: string;
 }) {
@@ -27,7 +29,7 @@ export function SummaryCard({
       <div className="relative">
         <p className={cn("text-sm font-medium text-ink-soft")}>{label}</p>
         <div className="mt-2">
-          <Money value={value} size="lg" />
+          <Money value={value} size="lg" {...(prefix ? { prefix } : {})} />
         </div>
         {meta && <p className="mt-1.5 text-xs text-ink-soft">{meta}</p>}
       </div>
