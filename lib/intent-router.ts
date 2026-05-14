@@ -119,7 +119,7 @@ async function userDefaultCurrency(userId: string): Promise<string> {
 // Handlers — each returns a human-friendly response string.
 // ============================================================
 
-async function answerTotalBalance(userId: string): Promise<string> {
+export async function answerTotalBalance(userId: string): Promise<string> {
   const list = await listSources(userId, false);
   if (list.length === 0) return "You haven't added any sources yet. Head to **Sources** to add a wallet or bank account.";
   const byCur: Record<string, number> = {};
@@ -137,14 +137,14 @@ async function answerTotalBalance(userId: string): Promise<string> {
   return out.join("\n");
 }
 
-async function answerSources(userId: string): Promise<string> {
+export async function answerSources(userId: string): Promise<string> {
   const list = await listSources(userId, false);
   if (list.length === 0) return "No sources yet.";
   const lines = list.map((s) => `• **${s.name}** (${s.type.replace("_", " ")}): ${fmt(s.balance, s.currency)}`);
   return lines.join("\n");
 }
 
-async function answerMonthSummary(userId: string, yearMonth: string): Promise<string> {
+export async function answerMonthSummary(userId: string, yearMonth: string): Promise<string> {
   const id = await resolveMonthId(userId, yearMonth);
   if (!id) return `No data for ${monthLabel(yearMonth)}.`;
   const s = await getMonthSummary(userId, id);
@@ -159,7 +159,7 @@ async function answerMonthSummary(userId: string, yearMonth: string): Promise<st
   return lines.join("\n");
 }
 
-async function answerSpendingByCategory(
+export async function answerSpendingByCategory(
   userId: string,
   yearMonth: string,
   categoryFilter?: string
@@ -194,7 +194,7 @@ async function answerSpendingByCategory(
   return lines.join("\n");
 }
 
-async function answerRecentTransactions(userId: string, limit = 10, kind?: "income" | "expense" | "transfer"): Promise<string> {
+export async function answerRecentTransactions(userId: string, limit = 10, kind?: "income" | "expense" | "transfer"): Promise<string> {
   const rows = await db
     .select({
       kind: transactions.kind,
@@ -222,7 +222,7 @@ async function answerRecentTransactions(userId: string, limit = 10, kind?: "inco
   return lines.join("\n");
 }
 
-async function answerCompareMonths(userId: string): Promise<string> {
+export async function answerCompareMonths(userId: string): Promise<string> {
   const cur = getCurrentYearMonth();
   const prev = getPrevYearMonth(cur);
   const curId = await resolveMonthId(userId, cur);
@@ -244,7 +244,7 @@ async function answerCompareMonths(userId: string): Promise<string> {
   return lines.join("\n");
 }
 
-async function answerMonthlyTrend(userId: string): Promise<string> {
+export async function answerMonthlyTrend(userId: string): Promise<string> {
   const rows = await getMonthlyTrend(userId, 6);
   if (rows.length === 0) return "No monthly data yet.";
   const def = await userDefaultCurrency(userId);
@@ -255,7 +255,7 @@ async function answerMonthlyTrend(userId: string): Promise<string> {
   return lines.join("\n");
 }
 
-async function answerGoals(userId: string): Promise<string> {
+export async function answerGoals(userId: string): Promise<string> {
   const list = await listGoals(userId);
   if (list.length === 0) return "You haven't set any savings goals yet. Head to **Goals** to add one.";
   const active = list.filter((g) => !g.completedAt);
@@ -274,7 +274,7 @@ async function answerGoals(userId: string): Promise<string> {
   return lines.join("\n");
 }
 
-async function answerGroups(userId: string): Promise<string> {
+export async function answerGroups(userId: string): Promise<string> {
   const list = await listGroups(userId, false);
   if (list.length === 0) return "You haven't joined any groups yet. Head to **Groups** to create one.";
   const lines = [`You're in ${list.length} ${list.length === 1 ? "group" : "groups"}:`];
@@ -290,7 +290,7 @@ async function answerGroups(userId: string): Promise<string> {
   return lines.join("\n");
 }
 
-async function answerFriends(userId: string): Promise<string> {
+export async function answerFriends(userId: string): Promise<string> {
   const list = await listFriends(userId);
   if (list.length === 0) return "No friends added yet.";
   const lines = [`Friends:`];
@@ -307,7 +307,7 @@ async function answerFriends(userId: string): Promise<string> {
   return lines.join("\n");
 }
 
-async function answerOverallBalances(userId: string): Promise<string> {
+export async function answerOverallBalances(userId: string): Promise<string> {
   const entries = await getOverallBalances(userId);
   if (entries.length === 0) return "All settled up across every group and friend.";
   const totals = summarizeBalances(entries);
@@ -332,7 +332,7 @@ async function answerOverallBalances(userId: string): Promise<string> {
   return lines.join("\n");
 }
 
-function answerHelp(): string {
+export function answerHelp(): string {
   const lines = [
     "I can answer specific questions about your money — try these:",
     ...SUGGESTIONS.map((s) => `• ${s}`),
@@ -445,7 +445,11 @@ const INTENTS: Intent[] = [
   },
 ];
 
-export async function routeIntent(userId: string, message: string): Promise<string> {
+/**
+ * Returns a string answer when a regex intent matches, or `null` if nothing matched.
+ * Callers (e.g., the Gemini fallback in `lib/assistant.ts`) decide what to do on null.
+ */
+export async function routeIntent(userId: string, message: string): Promise<string | null> {
   const m = message.trim().toLowerCase();
   if (m === "") return answerHelp();
   for (const intent of INTENTS) {
@@ -458,6 +462,11 @@ export async function routeIntent(userId: string, message: string): Promise<stri
       }
     }
   }
+  return null;
+}
+
+/** Help string used when neither the regex router nor the LLM classifier could resolve an intent. */
+export function noMatchHelp(): string {
   return [
     "I didn't quite get that. Here are some things I can answer:",
     ...SUGGESTIONS.slice(0, 6).map((s) => `• ${s}`),
