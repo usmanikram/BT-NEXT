@@ -49,7 +49,7 @@ export async function classifyIntentGemini(message: string): Promise<Intent> {
   if (!ai) return { intent: "unknown" };
   try {
     const res = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: message,
       config: {
         systemInstruction: SYSTEM_PROMPT,
