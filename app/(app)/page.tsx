@@ -323,24 +323,42 @@ export default async function DashboardPage({
           <EmptyState icon={Receipt} title="No spends yet" />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {recent.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center gap-3 rounded-2xl bg-cream-soft px-3 py-2.5"
-              >
-                <CategoryIcon name={r.categoryName} color={r.categoryColor} size="md" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate">{r.description}</p>
-                  <p className="text-xs text-ink-soft truncate">
-                    {r.categoryName} · {formatDate(r.expenseDate)}
-                  </p>
+            {recent.map((r) => {
+              const sharedLabel = r.isShared
+                ? r.payerName
+                  ? `Paid by ${r.payerName}${r.groupName ? ` · ${r.groupName}` : ""}`
+                  : `Shared${r.groupName ? ` · ${r.groupName}` : ""}`
+                : null;
+              return (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-3 rounded-2xl bg-cream-soft px-3 py-2.5"
+                >
+                  <CategoryIcon name={r.categoryName} color={r.categoryColor} size="md" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{r.description}</p>
+                    <p className="text-xs text-ink-soft truncate">
+                      {r.categoryName} · {formatDate(r.expenseDate)}
+                    </p>
+                    {sharedLabel && (
+                      <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-coral">
+                        <span className="inline-block size-1.5 rounded-full bg-coral" />
+                        {sharedLabel}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="font-display text-base font-semibold tabular-nums">
+                      <span className="text-xs text-ink-soft font-medium">Rs </span>
+                      {new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(r.amount)}
+                    </span>
+                    {r.isShared && r.payerName && (
+                      <p className="text-[10px] text-ink-soft">your share</p>
+                    )}
+                  </div>
                 </div>
-                <span className="font-display text-base font-semibold tabular-nums">
-                  <span className="text-xs text-ink-soft font-medium">Rs </span>
-                  {new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(r.amount)}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

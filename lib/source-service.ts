@@ -21,6 +21,11 @@ export type SourceWithBalance = {
  *     + sum(transfer where dest_source = X)
  *     - sum(expense where source = X)
  *     - sum(transfer where source = X)
+ *
+ * The `transactions.user_id = sources.user_id` clause is defensive: validateRefs in the
+ * action layer should already guarantee that any transaction referencing a source is
+ * owned by the same user. Without this clause, any data-integrity drift (bad migration,
+ * direct SQL, future feature) silently leaks balances across users.
  */
 const balanceDelta = sql<string>`
   COALESCE((
@@ -32,8 +37,8 @@ const balanceDelta = sql<string>`
       ELSE 0
     END)
     FROM ${transactions}
-    WHERE ${transactions.sourceId} = ${sources.id}
-       OR ${transactions.destSourceId} = ${sources.id}
+    WHERE (${transactions.sourceId} = ${sources.id} OR ${transactions.destSourceId} = ${sources.id})
+      AND ${transactions.userId} = ${sources.userId}
   ), 0)
 `;
 

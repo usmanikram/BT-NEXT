@@ -1,6 +1,14 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { categoriesV2, budgets, transactions, userExpenseShares, months } from "@/db/schema";
+import {
+  categoriesV2,
+  budgets,
+  transactions,
+  userExpenseShares,
+  months,
+  users,
+  groups,
+} from "@/db/schema";
 
 const n = (v: string | number | null | undefined) =>
   typeof v === "number" ? v : parseFloat((v as string) ?? "0") || 0;
@@ -141,10 +149,17 @@ export async function getCategoryBreakdown(
 export type RecentExpenseRow = {
   id: number;
   expenseDate: string;
+  /** The user's *share* of the expense (not necessarily the full transaction amount). */
   amount: number;
   description: string;
   categoryName: string;
   categoryColor: string;
+  /** True if this row is a participant share in a shared expense (group or 1-to-1 friend). */
+  isShared: boolean;
+  /** Non-null only when isShared and the payer is someone other than the viewing user. */
+  payerName: string | null;
+  /** Group name when the shared expense is group-scoped; null for 1-to-1 splits and personal expenses. */
+  groupName: string | null;
 };
 
 export async function getRecentExpenses(
@@ -155,7 +170,8 @@ export async function getRecentExpenses(
   const yearMonth = await getYearMonth(userId, monthId);
   if (!yearMonth) return [];
 
-  // Source from the view (user's share) but JOIN transactions for description + created_at.
+  // Source from the view (user's share) but JOIN transactions for description + payer/group
+  // metadata so the dashboard can label shared-expense participation clearly.
   const rows = await db
     .select({
       id: userExpenseShares.transactionId,
@@ -165,10 +181,17 @@ export async function getRecentExpenses(
       createdAt: transactions.createdAt,
       categoryName: categoriesV2.name,
       categoryColor: categoriesV2.color,
+      isShared: transactions.isShared,
+      payerId: transactions.userId,
+      payerFullName: users.fullName,
+      payerEmail: users.email,
+      groupName: groups.name,
     })
     .from(userExpenseShares)
     .innerJoin(transactions, eq(userExpenseShares.transactionId, transactions.id))
     .leftJoin(categoriesV2, eq(userExpenseShares.categoryId, categoriesV2.id))
+    .leftJoin(users, eq(transactions.userId, users.id))
+    .leftJoin(groups, eq(transactions.groupId, groups.id))
     .where(
       and(
         eq(userExpenseShares.userId, userId),
@@ -178,14 +201,22 @@ export async function getRecentExpenses(
     .orderBy(desc(userExpenseShares.occurredAt), desc(transactions.createdAt))
     .limit(limit);
 
-  return rows.map((r) => ({
-    id: r.id,
-    expenseDate: r.occurredAt.toISOString().slice(0, 10),
-    amount: n(r.amount),
-    description: r.description ?? "",
-    categoryName: r.categoryName ?? "Uncategorized",
-    categoryColor: r.categoryColor ?? "#A98AD6",
-  }));
+  return rows.map((r) => {
+    const payerIsOther = r.isShared && r.payerId !== userId;
+    return {
+      id: r.id,
+      expenseDate: r.occurredAt.toISOString().slice(0, 10),
+      amount: n(r.amount),
+      description: r.description ?? "",
+      categoryName: r.categoryName ?? "Uncategorized",
+      categoryColor: r.categoryColor ?? "#A98AD6",
+      isShared: r.isShared,
+      payerName: payerIsOther
+        ? (r.payerFullName ?? r.payerEmail?.split("@")[0] ?? "Someone")
+        : null,
+      groupName: r.groupName ?? null,
+    };
+  });
 }
 
 export type CategoryTotalRow = { name: string; color: string; total: number };
